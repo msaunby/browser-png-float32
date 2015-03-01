@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html ng-app="bintest">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PNG data array tests</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
+    <script>
+
+angular.module('bintest', [])
+.controller('MainController', function($scope, $http, $rootScope) {
+
+     // Note, this could be on another server. Cross domain should work OK.
+     $scope.png_test = "/cappng?type=H";
+
+     $scope.full_array = null;
+     $scope.blob = null;
+     $scope.imageUrl = null;
+     $scope.floatArray = null;
+
+     $scope.fetchData = function( url ){
+       var imageObj = new Image();
+       var canvas = document.createElement( 'canvas' );
+       var context = canvas.getContext('2d');
+       imageObj.onload = function() {
+            console.log('loaded', typeof(this));
+            canvas.width = this.width;
+            canvas.height = this.height;
+            context.drawImage(this, 0, 0);
+            var imageData = context.getImageData(0,0,this.width, this.height).data;
+            // NB. Resulting image data has 4 bytes per pixel (r,g,b,a) so for
+            // grayscale (byte) values these are (v,v,v,255). For 16 bit grayscale the values are scaled 0-255.
+	    $rootScope.$apply(function(){
+              console.log("image data length", imageData.length);
+              var buffer = new ArrayBuffer(imageData.length);
+              // Write to the buffer as bytes - always
+	      (new Uint8Array(buffer)).set( imageData );
+              // Read whatever type was packed into the PNG
+              // 32 bit types will map directly to pixels (RGBA) so the context.getImageData() call could
+              // be used to extract rectangular sections from a 2D array.
+              // Caution.  There may be endian issues with some of this.  Need to figure out how to test.
+	      $scope.floatArray = new Float32Array(buffer);
+	      console.log("float data length", $scope.floatArray.length);
+              console.log("float data", $scope.floatArray);
+            });
+       };
+       $http.get(url, {responseType: "arraybuffer"}).
+       success(function(data, status, headers, config) {
+         console.log('headers', headers());
+         $scope.blob = new Blob([data], {type: "image/png"});
+         imageObj.src = URL.createObjectURL( $scope.blob );
+       }).
+       error(function(data, status, headers, config) {
+        console.log(status, data);
+       });
+     }
+   
+   $scope.fetchData( $scope.png_test );
+
+ });
+</script>
+</head>
+<body ng-app="bintest" style="overflow: scroll;">
+
+<p>
+To get useful information open the JavaScript console.  
+</p>
+<p>
+To get timing information in Chrome enable console 
+log timestamps. (In JavaScript console settings).
+</p>
+<div ng-controller="MainController">
+
+<pre>Blob size {{blob.size}}</pre>
+<pre>Float data {{floatArray}}</pre>
+
+<img id="photo"></img>
+<div id="canv"></div>
+
+</div> <!-- MainController -->
+
+</body>
+</html>
